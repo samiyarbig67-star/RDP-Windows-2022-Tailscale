@@ -47,7 +47,9 @@ jobs:
         Invoke-WebRequest `
           -Uri https://download.nomachine.com/download/8.15/Windows/nomachine_8.15.3_1_x64.exe `
           -OutFile nomachine.exe
-        Start-Process nomachine.exe -ArgumentList "/S" -Wait
+
+        # اجرا با cmd /c برای اطمینان
+        cmd /c "nomachine.exe /S /D=C:\Program Files\NoMachine"
 
     # ==============================
     # Configure NoMachine
