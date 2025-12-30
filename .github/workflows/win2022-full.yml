@@ -1,4 +1,4 @@
-name: HenWindows 2022 NoMachine (Fixed)
+name: HenWindows 2022 NoMachine (Final Fix)
 
 on: workflow_dispatch
 
@@ -23,31 +23,23 @@ jobs:
       run: |
         & "C:\Program Files\Tailscale\tailscale.exe" up --authkey $Env:TAILSCALE_AUTHKEY --hostname "Github-NoMachine"
 
-    - name: 4. Install NoMachine (Safe Mode)
+    - name: 4. Install NoMachine
       run: |
         Write-Host "Installing NoMachine..."
-        # نصب بدون چک کردن checksum برای جلوگیری از ارور
         choco install nomachine -y --ignore-checksums --force
-        
-        Write-Host "Installation done. Waiting for files..."
-        Start-Sleep -Seconds 20
+        Write-Host "Installation done."
 
-    - name: 5. Start NoMachine Manually
-      # این بخش جایگزین کدی شده که ارور میداد
+    - name: 5. Start NoMachine (Simplified)
+      # این بخش اصلاح شد تا ارور ParserError ندهد
       run: |
         $nxPath = "C:\Program Files (x86)\NoMachine\bin\nxserver.exe"
-        
         if (Test-Path $nxPath) {
-            Write-Host "Found NoMachine executable. Attempting to start..."
-            # تلاش برای استارت دستی به جای سرویس
-            try {
-                & $nxPath --startup
-                Write-Host "NoMachine startup command executed."
-            } catch {
-                Write-Host "Could not start nxserver via command line. Ignoring..."
-            }
+            Write-Host "Found NoMachine. Starting service..."
+            # استفاده از Start-Process به جای try/catch برای جلوگیری از ارور سینتکس
+            Start-Process -FilePath $nxPath -ArgumentList "--startup" -ErrorAction SilentlyContinue
+            Write-Host "Startup command executed."
         } else {
-            Write-Host "WARNING: NoMachine path not found. You might need to use RDP."
+            Write-Host "NoMachine executable not found."
         }
 
     - name: 6. Configure System & Firewall
@@ -59,7 +51,7 @@ jobs:
         $pass = ConvertTo-SecureString "HenWindows2024!" -AsPlainText -Force
         Set-LocalUser -Name "runneradmin" -Password $pass
         
-        # فعال کردن RDP به عنوان بکاپ (چون NoMachine بدون ریستارت ممکن است تصویر ندهد)
+        # فعال کردن RDP به عنوان بکاپ
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
         Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
 
@@ -73,7 +65,7 @@ jobs:
         Write-Host "Password: HenWindows2024!"
         Write-Host "---------------------------------------------------"
         Write-Host "Try NoMachine (Port 4000)"
-        Write-Host "If NoMachine fails (Black Screen), use RDP (Port 3389)"
+        Write-Host "If NoMachine fails, use RDP (Port 3389)"
         Write-Host "==================================================="
 
     - name: 8. Keep Alive
@@ -82,6 +74,4 @@ jobs:
         while ($true) {
           Start-Sleep -Seconds 60
         }
-          Start-Sleep -Seconds 60
-          Write-Host "Still running..."
-        }
+        
