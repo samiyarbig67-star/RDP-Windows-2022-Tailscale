@@ -1,4 +1,4 @@
-name: HenWindows 2022 NoMachine (NX)
+name: HenWindows 2022 NoMachine (Fixed)
 
 on: workflow_dispatch
 
@@ -9,7 +9,6 @@ jobs:
 
     steps:
     - name: 1. Install Tailscale
-      # نصب دستی Tailscale طبق کد قبلی شما
       run: |
         Invoke-WebRequest -Uri https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe -OutFile tailscale-setup.exe
         Start-Process tailscale-setup.exe -ArgumentList "/quiet", "/norestart" -Wait
@@ -24,46 +23,65 @@ jobs:
       run: |
         & "C:\Program Files\Tailscale\tailscale.exe" up --authkey $Env:TAILSCALE_AUTHKEY --hostname "Github-NoMachine"
 
-    - name: 4. Install NoMachine (NX Protocol)
-      # نصب NoMachine با استفاده از Chocolatey (روش استاندارد ویندوز)
+    - name: 4. Install NoMachine (Safe Mode)
       run: |
         Write-Host "Installing NoMachine..."
-        choco install nomachine -y --ignore-checksums
+        # نصب بدون چک کردن checksum برای جلوگیری از ارور
+        choco install nomachine -y --ignore-checksums --force
         
-        # اطمینان از اجرای سرویس
-        Start-Sleep -Seconds 10
-        Get-Service -Name "nxserver" | Start-Service -PassThru
+        Write-Host "Installation done. Waiting for files..."
+        Start-Sleep -Seconds 20
 
-    - name: 5. Configure System & Firewall
+    - name: 5. Start NoMachine Manually
+      # این بخش جایگزین کدی شده که ارور میداد
       run: |
-        # باز کردن پورت 4000 برای NoMachine
+        $nxPath = "C:\Program Files (x86)\NoMachine\bin\nxserver.exe"
+        
+        if (Test-Path $nxPath) {
+            Write-Host "Found NoMachine executable. Attempting to start..."
+            # تلاش برای استارت دستی به جای سرویس
+            try {
+                & $nxPath --startup
+                Write-Host "NoMachine startup command executed."
+            } catch {
+                Write-Host "Could not start nxserver via command line. Ignoring..."
+            }
+        } else {
+            Write-Host "WARNING: NoMachine path not found. You might need to use RDP."
+        }
+
+    - name: 6. Configure System & Firewall
+      run: |
+        # باز کردن پورت 4000
         New-NetFirewallRule -DisplayName "NoMachine-NX" -Direction Inbound -LocalPort 4000 -Protocol TCP -Action Allow
         
-        # تنظیم رمز عبور برای یوزر اصلی (runneradmin)
-        # این رمز را باید در برنامه NoMachine وارد کنید
+        # تنظیم رمز عبور
         $pass = ConvertTo-SecureString "HenWindows2024!" -AsPlainText -Force
         Set-LocalUser -Name "runneradmin" -Password $pass
         
-        # جلوگیری از به خواب رفتن سیستم
+        # فعال کردن RDP به عنوان بکاپ (چون NoMachine بدون ریستارت ممکن است تصویر ندهد)
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
 
-    - name: 6. Get Connection Info
+    - name: 7. Get Connection Info
       run: |
         $tailscale_ip = & "C:\Program Files\Tailscale\tailscale.exe" ip -4
         Write-Host "==================================================="
-        Write-Host "CONNECTION DETAILS for NoMachine:"
-        Write-Host "Protocol: NX"
-        Write-Host "Host: $tailscale_ip"
-        Write-Host "Port: 4000"
+        Write-Host "CONNECTION DETAILS"
+        Write-Host "IP: $tailscale_ip"
         Write-Host "Username: runneradmin"
         Write-Host "Password: HenWindows2024!"
+        Write-Host "---------------------------------------------------"
+        Write-Host "Try NoMachine (Port 4000)"
+        Write-Host "If NoMachine fails (Black Screen), use RDP (Port 3389)"
         Write-Host "==================================================="
 
-    - name: 7. Keep Alive (Loop)
-      # حلقه برای روشن نگه داشتن سرور
+    - name: 8. Keep Alive
       run: |
-        Write-Host "Server is running. Connect via NoMachine now."
+        Write-Host "Server is running..."
         while ($true) {
+          Start-Sleep -Seconds 60
+        }
           Start-Sleep -Seconds 60
           Write-Host "Still running..."
         }
